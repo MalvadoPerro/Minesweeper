@@ -8,16 +8,17 @@ import java.util.function.BiConsumer;
 
 /**
  * Панель с игровым полем, таймером и клетками-кнопками.
+ * Теперь поле обёрнуто в JScrollPane для поддержки больших размеров.
  */
 public class GamePanel extends JPanel {
     private MinesweeperGame game;
-    private JLabel timeLabel;                       // отображение времени
-    private JPanel gridPanel;                       // сетка кнопок
-    private CellButton[][] buttons;                 // матрица кнопок
-    private Timer swingTimer;                       // таймер для обновления времени раз в секунду
-    private long startTime;                         // время начала игры
-    private BiConsumer<Boolean, Integer> gameFinishedCallback; // (победа?, время)
-    private boolean gameActive;                     // активна ли игра
+    private JLabel timeLabel;
+    private JPanel gridPanel;
+    private CellButton[][] buttons;
+    private Timer swingTimer;
+    private long startTime;
+    private BiConsumer<Boolean, Integer> gameFinishedCallback;
+    private boolean gameActive;
 
     public GamePanel(MinesweeperGame game, BiConsumer<Boolean, Integer> gameFinishedCallback) {
         this.game = game;
@@ -27,18 +28,15 @@ public class GamePanel extends JPanel {
         initComponents();
     }
 
-    /**
-     * Строит верхнюю панель с таймером и сетку кнопок.
-     */
     private void initComponents() {
-        // Верхняя панель
+        // Верхняя панель с таймером
         JPanel topPanel = new JPanel();
         timeLabel = new JLabel("Время: 0 сек");
         timeLabel.setFont(new Font("Arial", Font.BOLD, 16));
         topPanel.add(timeLabel);
         add(topPanel, BorderLayout.NORTH);
 
-        // Сетка игрового поля
+        // Сетка кнопок внутри прокручиваемой области
         gridPanel = new JPanel(new GridLayout(game.getRows(), game.getCols(), 0, 0));
         buttons = new CellButton[game.getRows()][game.getCols()];
         for (int r = 0; r < game.getRows(); r++) {
@@ -48,28 +46,22 @@ public class GamePanel extends JPanel {
                 gridPanel.add(btn);
             }
         }
-        add(gridPanel, BorderLayout.CENTER);
 
-        // Таймер запустится после первого клика
+        JScrollPane scrollPane = new JScrollPane(gridPanel);
+        scrollPane.setBorder(null);                // убираем лишнюю рамку
+        add(scrollPane, BorderLayout.CENTER);
+
         swingTimer = new Timer(1000, e -> updateTime());
     }
 
-    /**
-     * Обновляет текст времени.
-     */
     private void updateTime() {
         long elapsed = (System.currentTimeMillis() - startTime) / 1000;
         timeLabel.setText("Время: " + elapsed + " сек");
     }
 
-    /**
-     * Обрабатывает клик левой или правой кнопкой мыши по клетке.
-     * @param leftClick true, если левая кнопка
-     */
     private void cellClicked(int row, int col, boolean leftClick) {
         if (!gameActive) return;
 
-        // Первый клик инициализирует минное поле и запускает таймер
         if (!game.isInitialized()) {
             game.initialize(row, col);
             startTime = System.currentTimeMillis();
@@ -77,15 +69,12 @@ public class GamePanel extends JPanel {
         }
 
         Cell cell = game.getCell(row, col);
-        if (cell.isOpen()) return;   // открытые клетки не обрабатываем
+        if (cell.isOpen()) return;
 
         if (leftClick) {
-            // Левый клик: открыть клетку
-            if (cell.isFlagged()) return;   // флажок блокирует открытие
-
+            if (cell.isFlagged()) return;
             MinesweeperGame.ActionResult result = game.openCell(row, col);
             if (result == MinesweeperGame.ActionResult.MINE) {
-                // Взрыв
                 gameActive = false;
                 swingTimer.stop();
                 game.revealAll();
@@ -93,8 +82,7 @@ public class GamePanel extends JPanel {
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
                 gameFinishedCallback.accept(false, (int) elapsed);
             } else {
-                // Успешное открытие
-                updateAllButtons();   // обновляем все кнопки (учтёт каскадное открытие)
+                updateAllButtons();
                 if (game.isWin()) {
                     gameActive = false;
                     swingTimer.stop();
@@ -103,15 +91,13 @@ public class GamePanel extends JPanel {
                 }
             }
         } else {
-            // Правый клик: переключить флажок
             game.toggleFlag(row, col);
             updateButton(row, col);
         }
     }
 
     private void updateButton(int row, int col) {
-        CellButton btn = buttons[row][col];
-        btn.updateAppearance(game.getCell(row, col));
+        buttons[row][col].updateAppearance(game.getCell(row, col));
     }
 
     private void updateAllButtons() {
@@ -122,7 +108,7 @@ public class GamePanel extends JPanel {
         }
     }
 
-    // ----- Класс кнопки-клетки -----
+    // ----- Внутренний класс кнопки-клетки (без изменений) -----
     private class CellButton extends JButton {
         private int row, col;
 
@@ -135,7 +121,6 @@ public class GamePanel extends JPanel {
             setFocusPainted(false);
             setBackground(Color.LIGHT_GRAY);
 
-            // Обработка левой и правой кнопок мыши
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseReleased(MouseEvent e) {
@@ -148,20 +133,17 @@ public class GamePanel extends JPanel {
             });
         }
 
-        /**
-         * Обновляет внешний вид кнопки в зависимости от состояния клетки.
-         */
         public void updateAppearance(Cell cell) {
             if (cell.isOpen()) {
                 setBackground(Color.WHITE);
                 if (cell.isMine()) {
-                    setText("M");           // мина (можно заменить на другой символ)
+                    setText("M");
                     setForeground(Color.RED);
                 } else {
                     int mines = cell.getNeighborMines();
                     if (mines > 0) {
                         setText(String.valueOf(mines));
-                        switch (mines) {    // раскраска чисел
+                        switch (mines) {
                             case 1: setForeground(Color.BLUE); break;
                             case 2: setForeground(new Color(0, 128, 0)); break;
                             case 3: setForeground(Color.RED); break;
@@ -177,10 +159,9 @@ public class GamePanel extends JPanel {
                     }
                 }
             } else {
-                // Закрытая клетка
                 setBackground(Color.LIGHT_GRAY);
                 if (cell.isFlagged()) {
-                    setText("F");           // флаг
+                    setText("F");
                     setForeground(Color.RED);
                 } else {
                     setText("");
