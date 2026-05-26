@@ -151,4 +151,66 @@ public class MinesweeperGame {
         }
         return true;
     }
+
+    // ========== НОВЫЙ МЕТОД ДЛЯ CHORD ==========
+
+    /**
+     * Выполняет "chord" (аккорд) по открытой клетке с числом.
+     * Если количество флажков вокруг равно числу на клетке,
+     * открываются все соседние закрытые клетки без флажков.
+     * Если при этом встречается мина, возвращается MINE (проигрыш).
+     * @return ActionResult (OK, если действие выполнено или условие не соблюдено; MINE при подрыве)
+     */
+    public ActionResult chordCell(int row, int col) {
+        Cell cell = field[row][col];
+        // Работаем только с открытыми клетками, не минами
+        if (!cell.isOpen() || cell.isMine()) {
+            return ActionResult.OK;   // ничего не делаем
+        }
+
+        int flaggedNeighbors = countFlaggedNeighbors(row, col);
+        // Если количество флажков не совпадает с числом, выходим
+        if (flaggedNeighbors != cell.getNeighborMines()) {
+            return ActionResult.OK;
+        }
+
+        // Открываем всех соседей без флажков
+        for (int dr = -1; dr <= 1; dr++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                if (dr == 0 && dc == 0) continue;
+                int nr = row + dr;
+                int nc = col + dc;
+                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                    Cell neighbor = field[nr][nc];
+                    if (!neighbor.isOpen() && !neighbor.isFlagged()) {
+                        // Используем существующий метод открытия
+                        ActionResult res = openCell(nr, nc);
+                        if (res == ActionResult.MINE) {
+                            // Если наткнулись на мину — немедленно возвращаем проигрыш
+                            return ActionResult.MINE;
+                        }
+                    }
+                }
+            }
+        }
+        return ActionResult.OK;
+    }
+
+    /**
+     * Считает количество флажков вокруг заданной клетки.
+     */
+    private int countFlaggedNeighbors(int row, int col) {
+        int count = 0;
+        for (int dr = -1; dr <= 1; dr++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                if (dr == 0 && dc == 0) continue;
+                int nr = row + dr;
+                int nc = col + dc;
+                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && field[nr][nc].isFlagged()) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
 }

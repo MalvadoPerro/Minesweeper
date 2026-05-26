@@ -8,7 +8,8 @@ import java.util.function.BiConsumer;
 
 /**
  * Панель с игровым полем, таймером и клетками-кнопками.
- * Теперь поле обёрнуто в JScrollPane для поддержки больших размеров.
+ * Поддержка больших полей через JScrollPane.
+ * Обработка левого клика: закрытую клетку открывает, открытую — chord.
  */
 public class GamePanel extends JPanel {
     private MinesweeperGame game;
@@ -48,7 +49,7 @@ public class GamePanel extends JPanel {
         }
 
         JScrollPane scrollPane = new JScrollPane(gridPanel);
-        scrollPane.setBorder(null);                // убираем лишнюю рамку
+        scrollPane.setBorder(null);
         add(scrollPane, BorderLayout.CENTER);
 
         swingTimer = new Timer(1000, e -> updateTime());
@@ -59,9 +60,13 @@ public class GamePanel extends JPanel {
         timeLabel.setText("Время: " + elapsed + " сек");
     }
 
+    /**
+     * Обработчик клика по клетке (левая или правая кнопка).
+     */
     private void cellClicked(int row, int col, boolean leftClick) {
         if (!gameActive) return;
 
+        // Первый клик инициализирует минное поле и запускает таймер
         if (!game.isInitialized()) {
             game.initialize(row, col);
             startTime = System.currentTimeMillis();
@@ -69,33 +74,79 @@ public class GamePanel extends JPanel {
         }
 
         Cell cell = game.getCell(row, col);
-        if (cell.isOpen()) return;
 
         if (leftClick) {
-            if (cell.isFlagged()) return;
-            MinesweeperGame.ActionResult result = game.openCell(row, col);
-            if (result == MinesweeperGame.ActionResult.MINE) {
-                gameActive = false;
-                swingTimer.stop();
-                game.revealAll();
-                updateAllButtons();
-                long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-                gameFinishedCallback.accept(false, (int) elapsed);
+            // Левый клик
+            if (cell.isOpen()) {
+                // Если клетка уже открыта — попробовать chord
+                handleChord(row, col);
             } else {
-                updateAllButtons();
-                if (game.isWin()) {
-                    gameActive = false;
-                    swingTimer.stop();
-                    long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-                    gameFinishedCallback.accept(true, (int) elapsed);
-                }
+                // Обычное открытие закрытой клетки
+                handleOpen(row, col);
             }
         } else {
+            // Правый клик: переключение флажка
             game.toggleFlag(row, col);
             updateButton(row, col);
         }
     }
 
+    /**
+     * Открытие закрытой клетки.
+     */
+    private void handleOpen(int row, int col) {
+        Cell cell = game.getCell(row, col);
+        if (cell.isFlagged()) return;  // флажок блокирует открытие
+
+        MinesweeperGame.ActionResult result = game.openCell(row, col);
+        if (result == MinesweeperGame.ActionResult.MINE) {
+            gameOver(false);
+        } else {
+            updateAllButtons();
+            checkWin();
+        }
+    }
+
+    /**
+     * Выполнение chord по открытой клетке.
+     */
+    private void handleChord(int row, int col) {
+        MinesweeperGame.ActionResult chordResult = game.chordCell(row, col);
+        if (chordResult == MinesweeperGame.ActionResult.MINE) {
+            gameOver(false);
+        } else {
+            updateAllButtons();  // могли открыться новые клетки
+            checkWin();
+        }
+    }
+
+    /**
+     * Проверка условия победы и вызов колбэка.
+     */
+    private void checkWin() {
+        if (game.isWin()) {
+            gameActive = false;
+            swingTimer.stop();
+            long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+            gameFinishedCallback.accept(true, (int) elapsed);
+        }
+    }
+
+    /**
+     * Обработка проигрыша: остановка таймера, раскрытие мин, уведомление.
+     */
+    private void gameOver(boolean win) {
+        gameActive = false;
+        swingTimer.stop();
+        if (!win) {
+            game.revealAll();
+        }
+        updateAllButtons();
+        long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+        gameFinishedCallback.accept(win, (int) elapsed);
+    }
+
+    // ------- Обновление кнопок -------
     private void updateButton(int row, int col) {
         buttons[row][col].updateAppearance(game.getCell(row, col));
     }
@@ -108,7 +159,7 @@ public class GamePanel extends JPanel {
         }
     }
 
-    // ----- Внутренний класс кнопки-клетки (без изменений) -----
+    // ----- Внутренний класс кнопки-клетки -----
     private class CellButton extends JButton {
         private int row, col;
 
