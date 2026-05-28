@@ -12,9 +12,9 @@ import java.util.function.BiConsumer;
  */
 public class GamePanel extends JPanel {
     private MinesweeperGame game;
-    private JLabel mineCounterLabel;   // счётчик оставшихся мин
-    private JLabel timeLabel;          // таймер
-    private JButton restartButton;     // кнопка перезапуска
+    private JLabel mineCounterLabel;
+    private JLabel timeLabel;
+    private JButton restartButton;
     private JPanel gridPanel;
     private CellButton[][] buttons;
     private Timer swingTimer;
@@ -35,10 +35,10 @@ public class GamePanel extends JPanel {
     }
 
     private void initComponents() {
-        // Верхняя панель: счётчик мин, кнопка рестарта, таймер
+        // Верхняя панель
         add(createTopPanel(), BorderLayout.NORTH);
 
-        // Сетка кнопок внутри прокручиваемой области
+        // Сетка кнопок
         gridPanel = new JPanel(new GridLayout(game.getRows(), game.getCols(), 0, 0));
         buttons = new CellButton[game.getRows()][game.getCols()];
         for (int r = 0; r < game.getRows(); r++) {
@@ -55,22 +55,20 @@ public class GamePanel extends JPanel {
 
         swingTimer = new Timer(1000, e -> updateTime());
 
-        // Начальное отображение счётчика
         updateMineCounter();
     }
 
     /**
-     * Создаёт верхнюю панель в стиле табло: счётчик мин слева, кнопка рестарта по центру, таймер справа.
+     * Верхняя панель: счётчик мин (слева), кнопка рестарта (центр), таймер (справа).
      */
     private JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
-        // Стиль табло: чёрный фон, зелёный шрифт, вдавленная рамка
         Border loweredBorder = BorderFactory.createLoweredBevelBorder();
         Font digitalFont = new Font("Courier New", Font.BOLD, 20);
 
-        // ----- Левый счётчик мин -----
+        // Счётчик мин (слева)
         mineCounterLabel = new JLabel("", JLabel.CENTER);
         mineCounterLabel.setOpaque(true);
         mineCounterLabel.setBackground(Color.BLACK);
@@ -81,8 +79,8 @@ public class GamePanel extends JPanel {
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
         leftPanel.add(mineCounterLabel);
 
-        // ----- Центральная кнопка рестарта -----
-        restartButton = new JButton("↺");
+        // Кнопка рестарта (центр) – используем HTML для корректного отображения символа
+        restartButton = new JButton("<html><font face='Segoe UI Symbol' size=5>↺</font></html>");
         restartButton.setFont(new Font("Arial", Font.BOLD, 18));
         restartButton.setFocusPainted(false);
         restartButton.setPreferredSize(new Dimension(50, 36));
@@ -90,7 +88,7 @@ public class GamePanel extends JPanel {
         JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
         centerPanel.add(restartButton);
 
-        // ----- Правый таймер -----
+        // Таймер (справа)
         timeLabel = new JLabel("0", JLabel.CENTER);
         timeLabel.setOpaque(true);
         timeLabel.setBackground(Color.BLACK);
@@ -108,9 +106,6 @@ public class GamePanel extends JPanel {
         return topPanel;
     }
 
-    /**
-     * Перезапускает игру: останавливает таймер и вызывает внешний колбэк restartAction.
-     */
     private void restartGame() {
         if (swingTimer != null) {
             swingTimer.stop();
@@ -123,9 +118,6 @@ public class GamePanel extends JPanel {
         timeLabel.setText(String.valueOf(elapsed));
     }
 
-    /**
-     * Обновляет счётчик мин: totalMines - количество установленных флажков.
-     */
     private void updateMineCounter() {
         int remaining = game.getTotalMines() - game.getFlaggedCount();
         mineCounterLabel.setText(String.valueOf(remaining));
@@ -151,7 +143,7 @@ public class GamePanel extends JPanel {
         } else {
             game.toggleFlag(row, col);
             updateButton(row, col);
-            updateMineCounter();   // счётчик мог измениться
+            updateMineCounter();
         }
     }
 

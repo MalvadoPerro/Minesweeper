@@ -5,8 +5,8 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 
 /**
- * Главное окно игры. Управляет переключением между стартовым экраном и игровым полем.
- * Содержит кнопку рестарта на игровом поле.
+ * Главное окно игры. Стартовый экран с выбором размера поля и процента мин.
+ * Игровой экран с кнопкой рестарта, счётчиком мин и таймером.
  */
 public class GameWindow extends JFrame {
     private CardLayout cardLayout;
@@ -17,7 +17,10 @@ public class GameWindow extends JFrame {
     private MinesweeperGame game;
 
     private JComboBox<String> sizeCombo;
-    private int lastSize = 20;   // последний выбранный размер, по умолчанию 20
+    private JComboBox<String> percentCombo;
+
+    private int lastSize = 20;      // последний выбранный размер
+    private int lastPercent = 10;   // последний выбранный процент
 
     public GameWindow() {
         setTitle("Сапёр");
@@ -47,21 +50,49 @@ public class GameWindow extends JFrame {
     private JPanel createStartPanel() {
         JPanel panel = new JPanel(new BorderLayout());
 
-        // Панель выбора размера
-        JPanel sizePanel = new JPanel(new FlowLayout());
-        sizePanel.add(new JLabel("Размер поля:"));
+        // ---------- Верхняя панель с настройками ----------
+        JPanel settingsPanel = new JPanel(new GridBagLayout());
+        settingsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        // Подпись и выпадающий список для размера поля
+        JLabel sizeLabel = new JLabel("Размер поля:");
+        sizeLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        settingsPanel.add(sizeLabel, gbc);
+
         String[] sizes = {"10x10", "15x15", "20x20", "25x25", "30x30", "40x40", "50x50", "60x60"};
         sizeCombo = new JComboBox<>(sizes);
-        sizeCombo.setSelectedIndex(1);   // 20x20 по умолчанию
-        sizePanel.add(sizeCombo);
-        panel.add(sizePanel, BorderLayout.NORTH);
+        sizeCombo.setSelectedIndex(1);   // 20x20
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        settingsPanel.add(sizeCombo, gbc);
 
-        // Картинка
+        // Подпись и выпадающий список для процента мин
+        JLabel percentLabel = new JLabel("Процент мин:");
+        percentLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        settingsPanel.add(percentLabel, gbc);
+
+        String[] percents = {"5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%"};
+        percentCombo = new JComboBox<>(percents);
+        percentCombo.setSelectedIndex(1);  // 10%
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        settingsPanel.add(percentCombo, gbc);
+
+        panel.add(settingsPanel, BorderLayout.NORTH);
+
+        // ---------- Картинка в центре ----------
         ImageIcon imageIcon = createStartImage();
         JLabel imageLabel = new JLabel(imageIcon, JLabel.CENTER);
         panel.add(imageLabel, BorderLayout.CENTER);
 
-        // Кнопка "Начать игру"
+        // ---------- Кнопка "Начать игру" снизу ----------
         JButton playButton = new JButton("Начать игру");
         playButton.setFont(new Font("Arial", Font.BOLD, 18));
         playButton.addActionListener(e -> startGame());
@@ -104,18 +135,41 @@ public class GameWindow extends JFrame {
     }
 
     /**
-     * Запускает новую игру с настройками, выбранными на стартовом экране.
+     * Запускает новую игру с параметрами со стартового экрана.
      */
     private void startGame() {
-        String selected = (String) sizeCombo.getSelectedItem();
-        int size = Integer.parseInt(selected.split("x")[0]);
-        lastSize = size;   // запоминаем последний размер
+        String selectedSize = (String) sizeCombo.getSelectedItem();
+        int size = Integer.parseInt(selectedSize.split("x")[0]);
+        lastSize = size;
+
+        String selectedPercent = (String) percentCombo.getSelectedItem();
+        int percent = Integer.parseInt(selectedPercent.replace("%", ""));
+        lastPercent = percent;
 
         int totalCells = size * size;
-        int mines = Math.max(1, totalCells / 10);
+        int mines = Math.max(1, totalCells * percent / 100);
 
         game = new MinesweeperGame(size, size, mines);
 
+        switchToGamePanel();
+    }
+
+    /**
+     * Перезапускает игру с теми же lastSize и lastPercent.
+     */
+    private void restartGame() {
+        int totalCells = lastSize * lastSize;
+        int mines = Math.max(1, totalCells * lastPercent / 100);
+
+        game = new MinesweeperGame(lastSize, lastSize, mines);
+
+        switchToGamePanel();
+    }
+
+    /**
+     * Заменяет игровую панель на новую и показывает её.
+     */
+    private void switchToGamePanel() {
         if (gamePanel != null) {
             gamePanelContainer.remove(gamePanel);
         }
@@ -123,31 +177,11 @@ public class GameWindow extends JFrame {
         gamePanelContainer.add(gamePanel, BorderLayout.CENTER);
         gamePanelContainer.revalidate();
         gamePanelContainer.repaint();
-
         cardLayout.show(mainPanel, "game");
     }
 
     /**
-     * Перезапускает игру с тем же размером поля, не возвращаясь на стартовый экран.
-     */
-    private void restartGame() {
-        int totalCells = lastSize * lastSize;
-        int mines = Math.max(1, totalCells / 10);
-
-        game = new MinesweeperGame(lastSize, lastSize, mines);
-
-        if (gamePanel != null) {
-            gamePanelContainer.remove(gamePanel);
-        }
-        gamePanel = new GamePanel(game, this::onGameFinished, this::restartGame);
-        gamePanelContainer.add(gamePanel, BorderLayout.CENTER);
-        gamePanelContainer.revalidate();
-        gamePanelContainer.repaint();
-        // Карточка не переключается, остаёмся на игровом экране
-    }
-
-    /**
-     * Обработчик завершения игры (вызывается из GamePanel).
+     * Вызывается при завершении игры.
      */
     private void onGameFinished(boolean win, int timeElapsed) {
         String message;
