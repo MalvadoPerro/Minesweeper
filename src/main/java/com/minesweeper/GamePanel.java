@@ -1,41 +1,42 @@
 package com.minesweeper;
 
 import javax.swing.*;
+import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.function.BiConsumer;
 
 /**
- * Панель с игровым полем, таймером и клетками-кнопками.
- * Поддержка больших полей через JScrollPane.
- * Обработка левого клика: закрытую клетку открывает, открытую — chord.
+ * Панель с игровым полем, таймером, счётчиком мин и кнопкой перезапуска.
  */
 public class GamePanel extends JPanel {
     private MinesweeperGame game;
-    private JLabel timeLabel;
+    private JLabel mineCounterLabel;   // счётчик оставшихся мин
+    private JLabel timeLabel;          // таймер
+    private JButton restartButton;     // кнопка перезапуска
     private JPanel gridPanel;
     private CellButton[][] buttons;
     private Timer swingTimer;
     private long startTime;
     private BiConsumer<Boolean, Integer> gameFinishedCallback;
+    private Runnable restartAction;
     private boolean gameActive;
 
-    public GamePanel(MinesweeperGame game, BiConsumer<Boolean, Integer> gameFinishedCallback) {
+    public GamePanel(MinesweeperGame game,
+                     BiConsumer<Boolean, Integer> gameFinishedCallback,
+                     Runnable restartAction) {
         this.game = game;
         this.gameFinishedCallback = gameFinishedCallback;
+        this.restartAction = restartAction;
         this.gameActive = true;
         setLayout(new BorderLayout());
         initComponents();
     }
 
     private void initComponents() {
-        // Верхняя панель с таймером
-        JPanel topPanel = new JPanel();
-        timeLabel = new JLabel("Время: 0 сек");
-        timeLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        topPanel.add(timeLabel);
-        add(topPanel, BorderLayout.NORTH);
+        // Верхняя панель: счётчик мин, кнопка рестарта, таймер
+        add(createTopPanel(), BorderLayout.NORTH);
 
         // Сетка кнопок внутри прокручиваемой области
         gridPanel = new JPanel(new GridLayout(game.getRows(), game.getCols(), 0, 0));
@@ -53,20 +54,86 @@ public class GamePanel extends JPanel {
         add(scrollPane, BorderLayout.CENTER);
 
         swingTimer = new Timer(1000, e -> updateTime());
+
+        // Начальное отображение счётчика
+        updateMineCounter();
+    }
+
+    /**
+     * Создаёт верхнюю панель в стиле табло: счётчик мин слева, кнопка рестарта по центру, таймер справа.
+     */
+    private JPanel createTopPanel() {
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+        // Стиль табло: чёрный фон, зелёный шрифт, вдавленная рамка
+        Border loweredBorder = BorderFactory.createLoweredBevelBorder();
+        Font digitalFont = new Font("Courier New", Font.BOLD, 20);
+
+        // ----- Левый счётчик мин -----
+        mineCounterLabel = new JLabel("", JLabel.CENTER);
+        mineCounterLabel.setOpaque(true);
+        mineCounterLabel.setBackground(Color.BLACK);
+        mineCounterLabel.setForeground(Color.GREEN);
+        mineCounterLabel.setFont(digitalFont);
+        mineCounterLabel.setBorder(loweredBorder);
+        mineCounterLabel.setPreferredSize(new Dimension(70, 36));
+        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        leftPanel.add(mineCounterLabel);
+
+        // ----- Центральная кнопка рестарта -----
+        restartButton = new JButton("↺");
+        restartButton.setFont(new Font("Arial", Font.BOLD, 18));
+        restartButton.setFocusPainted(false);
+        restartButton.setPreferredSize(new Dimension(50, 36));
+        restartButton.addActionListener(e -> restartGame());
+        JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        centerPanel.add(restartButton);
+
+        // ----- Правый таймер -----
+        timeLabel = new JLabel("0", JLabel.CENTER);
+        timeLabel.setOpaque(true);
+        timeLabel.setBackground(Color.BLACK);
+        timeLabel.setForeground(Color.GREEN);
+        timeLabel.setFont(digitalFont);
+        timeLabel.setBorder(loweredBorder);
+        timeLabel.setPreferredSize(new Dimension(70, 36));
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        rightPanel.add(timeLabel);
+
+        topPanel.add(leftPanel, BorderLayout.WEST);
+        topPanel.add(centerPanel, BorderLayout.CENTER);
+        topPanel.add(rightPanel, BorderLayout.EAST);
+
+        return topPanel;
+    }
+
+    /**
+     * Перезапускает игру: останавливает таймер и вызывает внешний колбэк restartAction.
+     */
+    private void restartGame() {
+        if (swingTimer != null) {
+            swingTimer.stop();
+        }
+        restartAction.run();
     }
 
     private void updateTime() {
         long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-        timeLabel.setText("Время: " + elapsed + " сек");
+        timeLabel.setText(String.valueOf(elapsed));
     }
 
     /**
-     * Обработчик клика по клетке (левая или правая кнопка).
+     * Обновляет счётчик мин: totalMines - количество установленных флажков.
      */
+    private void updateMineCounter() {
+        int remaining = game.getTotalMines() - game.getFlaggedCount();
+        mineCounterLabel.setText(String.valueOf(remaining));
+    }
+
     private void cellClicked(int row, int col, boolean leftClick) {
         if (!gameActive) return;
 
-        // Первый клик инициализирует минное поле и запускает таймер
         if (!game.isInitialized()) {
             game.initialize(row, col);
             startTime = System.currentTimeMillis();
@@ -76,53 +143,43 @@ public class GamePanel extends JPanel {
         Cell cell = game.getCell(row, col);
 
         if (leftClick) {
-            // Левый клик
             if (cell.isOpen()) {
-                // Если клетка уже открыта — попробовать chord
                 handleChord(row, col);
             } else {
-                // Обычное открытие закрытой клетки
                 handleOpen(row, col);
             }
         } else {
-            // Правый клик: переключение флажка
             game.toggleFlag(row, col);
             updateButton(row, col);
+            updateMineCounter();   // счётчик мог измениться
         }
     }
 
-    /**
-     * Открытие закрытой клетки.
-     */
     private void handleOpen(int row, int col) {
         Cell cell = game.getCell(row, col);
-        if (cell.isFlagged()) return;  // флажок блокирует открытие
+        if (cell.isFlagged()) return;
 
         MinesweeperGame.ActionResult result = game.openCell(row, col);
         if (result == MinesweeperGame.ActionResult.MINE) {
             gameOver(false);
         } else {
             updateAllButtons();
+            updateMineCounter();
             checkWin();
         }
     }
 
-    /**
-     * Выполнение chord по открытой клетке.
-     */
     private void handleChord(int row, int col) {
         MinesweeperGame.ActionResult chordResult = game.chordCell(row, col);
         if (chordResult == MinesweeperGame.ActionResult.MINE) {
             gameOver(false);
         } else {
-            updateAllButtons();  // могли открыться новые клетки
+            updateAllButtons();
+            updateMineCounter();
             checkWin();
         }
     }
 
-    /**
-     * Проверка условия победы и вызов колбэка.
-     */
     private void checkWin() {
         if (game.isWin()) {
             gameActive = false;
@@ -132,9 +189,6 @@ public class GamePanel extends JPanel {
         }
     }
 
-    /**
-     * Обработка проигрыша: остановка таймера, раскрытие мин, уведомление.
-     */
     private void gameOver(boolean win) {
         gameActive = false;
         swingTimer.stop();
@@ -142,11 +196,11 @@ public class GamePanel extends JPanel {
             game.revealAll();
         }
         updateAllButtons();
+        updateMineCounter();
         long elapsed = (System.currentTimeMillis() - startTime) / 1000;
         gameFinishedCallback.accept(win, (int) elapsed);
     }
 
-    // ------- Обновление кнопок -------
     private void updateButton(int row, int col) {
         buttons[row][col].updateAppearance(game.getCell(row, col));
     }

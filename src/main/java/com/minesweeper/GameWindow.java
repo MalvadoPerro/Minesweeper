@@ -6,7 +6,7 @@ import java.awt.image.BufferedImage;
 
 /**
  * Главное окно игры. Управляет переключением между стартовым экраном и игровым полем.
- * Теперь на стартовом экране можно выбрать размер поля (от 15x15 до 60x60).
+ * Содержит кнопку рестарта на игровом поле.
  */
 public class GameWindow extends JFrame {
     private CardLayout cardLayout;
@@ -16,30 +16,25 @@ public class GameWindow extends JFrame {
     private GamePanel gamePanel;
     private MinesweeperGame game;
 
-    // Новое поле: выпадающий список для выбора размера
     private JComboBox<String> sizeCombo;
+    private int lastSize = 20;   // последний выбранный размер, по умолчанию 20
 
     public GameWindow() {
         setTitle("Сапёр");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setResizable(true);                     // теперь окно можно растягивать
-        setMinimumSize(new Dimension(600, 650)); // минимальный размер
+        setResizable(true);
+        setMinimumSize(new Dimension(600, 650));
         initUI();
-        setSize(800, 800);                      // начальный размер окна
+        setSize(700, 700);
         setLocationRelativeTo(null);
     }
 
-    /**
-     * Инициализация пользовательского интерфейса.
-     */
     private void initUI() {
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
-        // Стартовая панель с выбором размера
         startPanel = createStartPanel();
 
-        // Заглушка для игровой панели
         gamePanelContainer = new JPanel(new BorderLayout());
         gamePanelContainer.add(new JLabel("Игровое поле появится здесь", JLabel.CENTER));
 
@@ -49,27 +44,24 @@ public class GameWindow extends JFrame {
         add(mainPanel);
     }
 
-    /**
-     * Формирует стартовую панель: картинка, выбор размера и кнопка "Начать игру".
-     */
     private JPanel createStartPanel() {
         JPanel panel = new JPanel(new BorderLayout());
 
-        // Панель выбора размера (сверху)
+        // Панель выбора размера
         JPanel sizePanel = new JPanel(new FlowLayout());
         sizePanel.add(new JLabel("Размер поля:"));
-        String[] sizes = {"15x15", "20x20", "30x30", "40x40", "50x50", "60x60"};
+        String[] sizes = {"10x10", "15x15", "20x20", "25x25", "30x30", "40x40", "50x50", "60x60"};
         sizeCombo = new JComboBox<>(sizes);
-        sizeCombo.setSelectedIndex(1);   // по умолчанию 20x20
+        sizeCombo.setSelectedIndex(1);   // 20x20 по умолчанию
         sizePanel.add(sizeCombo);
         panel.add(sizePanel, BorderLayout.NORTH);
 
-        // Картинка (центр)
+        // Картинка
         ImageIcon imageIcon = createStartImage();
         JLabel imageLabel = new JLabel(imageIcon, JLabel.CENTER);
         panel.add(imageLabel, BorderLayout.CENTER);
 
-        // Кнопка "Начать игру" (снизу)
+        // Кнопка "Начать игру"
         JButton playButton = new JButton("Начать игру");
         playButton.setFont(new Font("Arial", Font.BOLD, 18));
         playButton.addActionListener(e -> startGame());
@@ -81,9 +73,6 @@ public class GameWindow extends JFrame {
         return panel;
     }
 
-    /**
-     * Создаёт изображение для стартового экрана (без изменений).
-     */
     private ImageIcon createStartImage() {
         int width = 200;
         int height = 150;
@@ -91,11 +80,9 @@ public class GameWindow extends JFrame {
         Graphics2D g2d = image.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // Фон
         g2d.setColor(new Color(70, 130, 180));
         g2d.fillRect(0, 0, width, height);
 
-        // Бомба
         g2d.setColor(Color.BLACK);
         g2d.fillOval(50, 30, 100, 100);
         g2d.setColor(Color.YELLOW);
@@ -105,7 +92,6 @@ public class GameWindow extends JFrame {
         g2d.drawLine(95, 15, 85, 5);
         g2d.drawLine(105, 15, 115, 5);
 
-        // Текст
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 24));
         String text = "САПЁР";
@@ -118,35 +104,50 @@ public class GameWindow extends JFrame {
     }
 
     /**
-     * Начинает новую игру с учётом выбранного размера.
+     * Запускает новую игру с настройками, выбранными на стартовом экране.
      */
     private void startGame() {
-        // Извлекаем выбранный размер
         String selected = (String) sizeCombo.getSelectedItem();
         int size = Integer.parseInt(selected.split("x")[0]);
+        lastSize = size;   // запоминаем последний размер
 
-        // Количество мин – примерно 10% от общего числа клеток
         int totalCells = size * size;
-        int mines = Math.max(1, totalCells / 10);   // хотя бы одна мина
+        int mines = Math.max(1, totalCells / 10);
 
-        // Создаём модель игры
         game = new MinesweeperGame(size, size, mines);
 
-        // Обновляем игровую панель
         if (gamePanel != null) {
             gamePanelContainer.remove(gamePanel);
         }
-        gamePanel = new GamePanel(game, this::onGameFinished);
+        gamePanel = new GamePanel(game, this::onGameFinished, this::restartGame);
         gamePanelContainer.add(gamePanel, BorderLayout.CENTER);
         gamePanelContainer.revalidate();
         gamePanelContainer.repaint();
 
-        // Переключаемся на игровое поле
         cardLayout.show(mainPanel, "game");
     }
 
     /**
-     * Обработчик завершения игры (без изменений).
+     * Перезапускает игру с тем же размером поля, не возвращаясь на стартовый экран.
+     */
+    private void restartGame() {
+        int totalCells = lastSize * lastSize;
+        int mines = Math.max(1, totalCells / 10);
+
+        game = new MinesweeperGame(lastSize, lastSize, mines);
+
+        if (gamePanel != null) {
+            gamePanelContainer.remove(gamePanel);
+        }
+        gamePanel = new GamePanel(game, this::onGameFinished, this::restartGame);
+        gamePanelContainer.add(gamePanel, BorderLayout.CENTER);
+        gamePanelContainer.revalidate();
+        gamePanelContainer.repaint();
+        // Карточка не переключается, остаёмся на игровом экране
+    }
+
+    /**
+     * Обработчик завершения игры (вызывается из GamePanel).
      */
     private void onGameFinished(boolean win, int timeElapsed) {
         String message;
