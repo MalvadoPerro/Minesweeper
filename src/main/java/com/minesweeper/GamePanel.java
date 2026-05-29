@@ -119,7 +119,7 @@ public class GamePanel extends JPanel {
     }
 
     private void updateMineCounter() {
-        int remaining = game.getTotalMines() - game.getFlaggedCount();
+        int remaining = Math.max(0, game.getTotalMines() - game.getFlaggedCount());
         mineCounterLabel.setText(String.valueOf(remaining));
     }
 
